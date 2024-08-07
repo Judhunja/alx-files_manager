@@ -1,4 +1,5 @@
 import dbClient from '../utils/db';
+import redisClient from '../utils/redis';
 
 const crypto = require('crypto');
 
@@ -27,19 +28,32 @@ export const postNew = async (req, resp) => {
 };
 
 export const getMe = async (req, resp) => {
-  const authHeader = req.headers.authorization;
+  const token = req.headers['x-token'];
 
-  const token = authHeader.split(' ')[0];
-
-  const users = dbClient.db.collection('users');
-  const user = await users.findOne({ token });
-
-  if (!user) {
+  if (!token) {
     return resp.status(401).json({ error: 'Unauthorized' });
   }
 
-  return resp.json({
-    email: user.email,
-    id: user._id,
+  const key = `auth_${token}`;
+
+  redisClient.client.get(key, async (err, userId) => {
+    if (err || !userId) {
+      console.error(err);
+    }
+    if (userId) {
+      return resp.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const users = dbClient.db.collection('users');
+    const user = await users.findOne({ _id: new dbClient.ObjectId(userId) });
+
+    if (!user) {
+      return resp.status(401).json({ error: 'Unauthorized' });
+    }
+
+    return resp.json({
+      email: user.email,
+      id: user._id,
+    });
   });
 };

@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import redisClient from '../utils/redis';
 import dbClient from '../utils/db';
 
@@ -10,10 +11,14 @@ export const getConnect = async (req, resp) => {
     return resp.status(401).json({ error: 'Unauthorized' });
   }
 
-  const token = authHeader.split(' ')[1];
+  const base64 = authHeader.split(' ')[1];
+
+  const toString = Buffer.from(base64, 'base64').toString('ascii');
+  const [email, password] = toString.split(':');
 
   const users = dbClient.db.collection('users');
-  const user = await users.findOne({ token });
+  const sha1pwd = crypto.createHash('sha1').update(password).digest('hex');
+  const user = await users.findOne({ email, password: sha1pwd });
 
   if (!user) {
     return resp.status(401).json({ error: 'Unauthorized' });
@@ -23,7 +28,7 @@ export const getConnect = async (req, resp) => {
 
   const key = `auth_${tkn}`;
 
-  redisClient.client.set(key, user.id, 'EX', 86400, (err) => {
+  redisClient.client.set(key, user._id.toString(), 'EX', 86400, (err) => {
     if (err) {
       console.error(err);
     }
