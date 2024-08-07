@@ -2,7 +2,7 @@ import dbClient from '../utils/db';
 
 const crypto = require('crypto');
 
-exports.postNew = async (req, resp) => {
+export const postNew = async (req, resp) => {
   const user = req.body;
   if (!user.email) {
     return resp.status(400).json({ error: 'Missing email' });
@@ -23,5 +23,23 @@ exports.postNew = async (req, resp) => {
   return resp.status(201).json({
     id: insertUser._id,
     email: insertUser.email,
+  });
+};
+
+export const getMe = async (req, resp) => {
+  const authHeader = req.headers.authorization;
+
+  const token = authHeader.split(' ')[0];
+
+  const users = dbClient.db.collection('users');
+  const user = await users.findOne({ token });
+
+  if (!user) {
+    return resp.status(401).json({ error: 'Unauthorized' });
+  }
+
+  return resp.json({
+    email: user.email,
+    id: user._id,
   });
 };
