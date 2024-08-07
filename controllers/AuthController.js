@@ -1,3 +1,4 @@
+import { ObjectId } from 'mongodb';
 import crypto from 'crypto';
 import redisClient from '../utils/redis';
 import dbClient from '../utils/db';
@@ -37,18 +38,36 @@ export const getConnect = async (req, resp) => {
 };
 
 export const getDisconnect = async (req, resp) => {
-  const authHeader = req.headers.authorization;
+  const token = req.headers['x-token'];
 
-  const token = authHeader.split(' ')[1];
-
-  const users = dbClient.db.collection('users');
-  const user = await users.findOne({ token });
-
-  if (!user) {
+  if (!token) {
     return resp.status(401).json({ error: 'Unauthorized' });
   }
 
+  const key = `auth_${token}`;
+
+  redisClient.client.get(key, async (err, userId) => {
+    if (err) {
+      console.error(err);
+    }
+    if (!userId) {
+      return resp.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const users = dbClient.db.collection('users');
+    const user = await users.findOne({ _id: new ObjectId(userId) });
+
+    if (!user) {
+      return resp.status(401).json({ error: 'Unauthorized' });
+    }
+
+    return resp.json({
+      email: user.email,
+      id: user._id,
+    });
+  });
+
   redisClient.client.del(`auth_${token}`);
 
-  return resp.json(204);
+  return resp.status(204);
 };

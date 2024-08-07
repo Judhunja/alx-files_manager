@@ -1,3 +1,4 @@
+import { ObjectId } from 'mongodb';
 import dbClient from '../utils/db';
 import redisClient from '../utils/redis';
 
@@ -36,16 +37,16 @@ export const getMe = async (req, resp) => {
 
   const key = `auth_${token}`;
 
-  redisClient.client.get(key, async (err, userId) => {
-    if (err || !userId) {
+  const userFound = redisClient.client.get(key, async (err, userId) => {
+    if (err) {
       console.error(err);
     }
-    if (userId) {
+    if (!userId) {
       return resp.status(401).json({ error: 'Unauthorized' });
     }
 
     const users = dbClient.db.collection('users');
-    const user = await users.findOne({ _id: new dbClient.ObjectId(userId) });
+    const user = await users.findOne({ _id: new ObjectId(userId) });
 
     if (!user) {
       return resp.status(401).json({ error: 'Unauthorized' });
@@ -56,4 +57,5 @@ export const getMe = async (req, resp) => {
       id: user._id,
     });
   });
+  return userFound;
 };
